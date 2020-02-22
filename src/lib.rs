@@ -11,8 +11,6 @@ pub fn run(program_settings: ProgramSettings) -> Result<(), Box<dyn Error>> {
 		case_sensitive_search(&program_settings.query, &contents)
 	};
 
-	println!("{:?}", results);
-
 	for line in results {
 		println!("{}", line);
 	}

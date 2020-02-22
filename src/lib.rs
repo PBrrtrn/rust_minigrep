@@ -1,16 +1,26 @@
 use std::fs;
+use std::env;
 use std::error::Error;
 
 pub fn run(program_settings: ProgramSettings) -> Result<(), Box<dyn Error>> {
 	let contents = fs::read_to_string(&program_settings.filename)?;
 
-	for line in search(&program_settings.query, &contents){
+	let results = if program_settings.case_insensitive {
+		search(&program_settings.query, &contents)
+	} else {
+		case_sensitive_search(&program_settings.query, &contents)
+	};
+
+	println!("{:?}", results);
+
+	for line in results {
 		println!("{}", line);
 	}
+
 	Ok(())
 }
 
-pub fn search<'a>(query: &str, contents: &'a str) -> Vec<&'a str> {
+pub fn case_sensitive_search<'a>(query: &str, contents: &'a str) -> Vec<&'a str> {
 	let mut results = Vec::new();
 
 	for line in contents.lines() {
@@ -22,9 +32,23 @@ pub fn search<'a>(query: &str, contents: &'a str) -> Vec<&'a str> {
 	results
 }
 
+pub fn search<'a>(query: &str, contents: &'a str) -> Vec<&'a str> {
+	let query = query.to_lowercase();
+	let mut results = Vec::new();
+
+	for line in contents.lines() {
+		if line.to_lowercase().contains(&query) {
+			results.push(line);
+		}
+	}
+
+	results
+}
+
 pub struct ProgramSettings {
 	pub query: String,
 	pub filename: String,
+	pub case_insensitive: bool,
 }
 impl ProgramSettings {
 	pub fn new(args: &[String]) -> Result<ProgramSettings, &'static str> {
@@ -32,7 +56,9 @@ impl ProgramSettings {
 		let query = args[1].clone();
 		let filename = args[2].clone();
 
-		Ok(ProgramSettings { query, filename })
+		let case_insensitive = env::var("CASE_SENSITIVE").is_err();
+
+		Ok(ProgramSettings { query, filename, case_insensitive })
 	}
 }
 
@@ -51,7 +77,15 @@ mod tests {
 	}
 
 	#[test]
-	fn search_with_one_result() {
+	fn search_without_matches() {
+		let query = "test";
+		let contents = "I don't contain any matches";
+
+		assert_eq!(0, search(query, contents).len());
+	}
+
+	#[test]
+	fn search_with_one_match() {
 		let query = "test";
 		let contents = "\
 			I'm running a test,
@@ -59,6 +93,19 @@ mod tests {
 			then, refactor it.";
 
 		assert_eq!(vec!["I'm running a test,"], search(query, contents));
+	}
+
+	#[test]
+	fn case_sensitive() {
+		let query = "TeSt";
+		let contents = "\
+			I'm running a test,
+			shall it debug my program, 
+			then, refactor it.
+
+			'i'M rUnNinG a TeSt'";
+
+		assert_eq!(vec!["\t\t\t'i'M rUnNinG a TeSt'"], case_sensitive_search(query, contents));
 	}
 
 /*	#[test]
